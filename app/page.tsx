@@ -54,7 +54,7 @@ export default function Home() {
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("http://localhost:8000/process-signal-timing", {
+        const response = await fetch("https://n4bg75z6gjwxyu36powqozpm4m0zidjo.lambda-url.us-east-1.on.aws/process-signal-timing", {
             method: "POST",
             body: formData,
         });
