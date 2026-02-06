@@ -56,7 +56,7 @@ export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
         "flex items-center justify-center gap-3",
         isDragOver
           ? "border-blue-500 bg-blue-500/10 scale-[1.02]"
-          : "border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800",
+          : "border-border bg-muted/50 hover:bg-muted",
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
@@ -68,8 +68,8 @@ export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
         accept=".pdf"
         disabled={disabled}
       />
-      <UploadCloud className="h-5 w-5 text-zinc-400" />
-      <span className="text-sm font-medium text-zinc-300">
+      <UploadCloud className="h-5 w-5 text-muted-foreground" />
+      <span className="text-sm font-medium text-foreground">
         Upload a signal timing sheet
       </span>
     </div>
