@@ -14,6 +14,7 @@ export function PDFViewer({ fileUrl, page }: { fileUrl: string | null; page?: nu
   return (
     <div className="h-full w-full overflow-hidden rounded-xl border border-border bg-card">
       <iframe
+        key={pdfSrc}
         src={pdfSrc}
         className="h-full w-full"
         title="PDF Preview"
