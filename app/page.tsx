@@ -24,15 +24,15 @@ const INITIAL_STEPS: PipelineStep[] = [
 
 export default function Home() {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [steps, setSteps] = useState<PipelineStep[]>(INITIAL_STEPS);
+  const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState<number | undefined>(undefined);
 
   const handleFileSelect = (file: File) => {
     const url = URL.createObjectURL(file);
     setFileUrl(url);
-    // Reset steps visually before starting
-    setSteps(INITIAL_STEPS.map(s => ({ ...s, status: "pending", reasoning: undefined, sources: undefined, actionLabel: undefined })));
+    // Reset steps to empty to allow them to "pop up" as they occur
+    setSteps([]);
     
     toast.info("Starting analysis...", { duration: 2000 }); // Optional: Notify start
     startProcessing(file);
@@ -41,7 +41,7 @@ export default function Home() {
   const handleClearSession = () => {
     if (fileUrl) URL.revokeObjectURL(fileUrl);
     setFileUrl(null);
-    setSteps(INITIAL_STEPS);
+    setSteps([]);
     setIsProcessing(false);
     setCurrentPage(undefined);
     toast.dismiss(); // Dismiss any lingering toasts
@@ -82,21 +82,39 @@ export default function Home() {
                     const event = JSON.parse(line);
                     
                     if (event.type === "progress") {
-                         setSteps(prev => prev.map(s => {
-                             // Activate current step
-                             if (s.label === event.step) {
-                                 return { 
-                                     ...s, 
+                         setSteps(prev => {
+                             const stepExists = prev.some(s => s.label === event.step);
+                             
+                             if (stepExists) {
+                                 // Update existing step (e.g. if we get multiple progress events for same step)
+                                 return prev.map(s => {
+                                     if (s.label === event.step) {
+                                         return { 
+                                             ...s, 
+                                             status: "running" as StepStatus,
+                                             sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : s.sources
+                                         };
+                                     }
+                                     return s;
+                                 });
+                             } else {
+                                 // New step starting!
+                                 const nextStepDef = INITIAL_STEPS.find(s => s.label === event.step);
+                                 if (!nextStepDef) return prev; // Unknown step
+
+                                 // 1. Mark all previous steps as completed
+                                 const completedPrev = prev.map(s => ({ ...s, status: "completed" as StepStatus }));
+                                 
+                                 // 2. Add new step as running
+                                 const newStep = {
+                                     ...nextStepDef,
                                      status: "running" as StepStatus,
-                                     sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : s.sources
+                                     sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : undefined
                                  };
-                             } 
-                             // Mark previous steps as completed
-                             else if (s.status === "running" && s.label !== event.step) {
-                                 return { ...s, status: "completed" as StepStatus };
+                                 
+                                 return [...completedPrev, newStep];
                              }
-                             return s;
-                         }));
+                         });
                          
                          // PDF Navigation (Auto)
                          if (event.pages && event.pages.length > 0) {
