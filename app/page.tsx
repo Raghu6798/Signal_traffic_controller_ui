@@ -31,7 +31,7 @@ export default function Home() {
   const handleFileSelect = (file: File) => {
     const url = URL.createObjectURL(file);
     setFileUrl(url);
-    // Reset steps to empty to allow them to "pop up" as they occur
+    // Reset steps to empty to show them appearing one by one
     setSteps([]);
     
     toast.info("Starting analysis...", { duration: 2000 }); // Optional: Notify start
@@ -83,37 +83,33 @@ export default function Home() {
                     
                     if (event.type === "progress") {
                          setSteps(prev => {
-                             const stepExists = prev.some(s => s.label === event.step);
-                             
-                             if (stepExists) {
-                                 // Update existing step (e.g. if we get multiple progress events for same step)
-                                 return prev.map(s => {
-                                     if (s.label === event.step) {
-                                         return { 
-                                             ...s, 
-                                             status: "running" as StepStatus,
-                                             sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : s.sources
-                                         };
-                                     }
-                                     return s;
-                                 });
-                             } else {
-                                 // New step starting!
-                                 const nextStepDef = INITIAL_STEPS.find(s => s.label === event.step);
-                                 if (!nextStepDef) return prev; // Unknown step
+                             // Mark previous running steps as completed
+                             const nextSteps = prev.map(s => 
+                                 s.status === "running" ? { ...s, status: "completed" as StepStatus } : s
+                             );
 
-                                 // 1. Mark all previous steps as completed
-                                 const completedPrev = prev.map(s => ({ ...s, status: "completed" as StepStatus }));
-                                 
-                                 // 2. Add new step as running
-                                 const newStep = {
-                                     ...nextStepDef,
+                             // Check if this step is already in the list
+                             const existingIndex = nextSteps.findIndex(s => s.label === event.step);
+                             
+                             if (existingIndex !== -1) {
+                                 // Update existing step to running
+                                 nextSteps[existingIndex] = {
+                                     ...nextSteps[existingIndex],
                                      status: "running" as StepStatus,
-                                     sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : undefined
+                                     sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : nextSteps[existingIndex].sources
                                  };
-                                 
-                                 return [...completedPrev, newStep];
+                             } else {
+                                 // Add new step from template
+                                 const template = INITIAL_STEPS.find(s => s.label === event.step);
+                                 if (template) {
+                                     nextSteps.push({
+                                         ...template,
+                                         status: "running" as StepStatus,
+                                         sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : undefined
+                                     });
+                                 }
                              }
+                             return nextSteps;
                          });
                          
                          // PDF Navigation (Auto)
