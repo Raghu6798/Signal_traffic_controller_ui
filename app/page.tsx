@@ -10,6 +10,7 @@ import TextType from "@/components/TextTyping";
 
 // These labels MUST match the 'step' value sent from factory.py
 const INITIAL_STEPS: PipelineStep[] = [
+  { id: "0", label: "Document Analysis", status: "pending" },
   { id: "1", label: "Day Plan Extraction", status: "pending" },
   { id: "2", label: "Action Plan Extraction", status: "pending" },
   { id: "3", label: "Barrier Mode Analysis", status: "pending" },
@@ -82,21 +83,35 @@ export default function Home() {
                     const event = JSON.parse(line);
                     
                     if (event.type === "progress") {
-                         setSteps(prev => prev.map(s => {
-                             // Activate current step
-                             if (s.label === event.step) {
-                                 return { 
-                                     ...s, 
+                         setSteps(prev => {
+                             // Mark previous running steps as completed
+                             const nextSteps = prev.map(s => 
+                                 s.status === "running" ? { ...s, status: "completed" as StepStatus } : s
+                             );
+
+                             // Check if this step is already in the list
+                             const existingIndex = nextSteps.findIndex(s => s.label === event.step);
+                             
+                             if (existingIndex !== -1) {
+                                 // Update existing step to running
+                                 nextSteps[existingIndex] = {
+                                     ...nextSteps[existingIndex],
                                      status: "running" as StepStatus,
-                                     sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : s.sources
+                                     sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : nextSteps[existingIndex].sources
                                  };
-                             } 
-                             // Mark previous steps as completed
-                             else if (s.status === "running" && s.label !== event.step) {
-                                 return { ...s, status: "completed" as StepStatus };
+                             } else {
+                                 // Add new step from template
+                                 const template = INITIAL_STEPS.find(s => s.label === event.step);
+                                 if (template) {
+                                     nextSteps.push({
+                                         ...template,
+                                         status: "running" as StepStatus,
+                                         sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : undefined
+                                     });
+                                 }
                              }
-                             return s;
-                         }));
+                             return nextSteps;
+                         });
                          
                          // PDF Navigation (Auto)
                          if (event.pages && event.pages.length > 0) {
@@ -104,15 +119,10 @@ export default function Home() {
                          }
 
                     } else if (event.type === "step_update") {
-                         // Real-time Reasoning & Sources Update
+                         // Real-time Reasoning Update
                          setSteps(prev => prev.map(s => {
                              if (s.label === event.step) {
-                                 const updates: Partial<PipelineStep> = {};
-                                 if (event.reasoning) updates.reasoning = event.reasoning;
-                                 if (event.pages) {
-                                     updates.sources = event.pages.map((p: number) => `Page ${p}`);
-                                 }
-                                 return { ...s, ...updates };
+                                 return { ...s, reasoning: event.reasoning };
                              }
                              return s;
                          }));
@@ -214,6 +224,7 @@ export default function Home() {
                 <PipelineVisualizer 
                     steps={steps} 
                     onPageClick={(page) => setCurrentPage(page)}
+                    isProcessing={isProcessing}
                 />
             )}
         </div>
