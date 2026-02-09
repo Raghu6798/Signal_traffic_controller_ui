@@ -224,6 +224,7 @@ export default function Home() {
                 <PipelineVisualizer 
                     steps={steps} 
                     onPageClick={(page) => setCurrentPage(page)}
+                    isProcessing={isProcessing}
                 />
             )}
         </div>

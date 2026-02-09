@@ -19,10 +19,20 @@ export interface PipelineStep {
 
 interface PipelineVisualizerProps {
   steps: PipelineStep[];
-  onPageClick: (page: number) => void; // <--- ADD THIS
+  onPageClick: (page: number) => void;
+  isProcessing?: boolean;
 }
 
-export function PipelineVisualizer({ steps, onPageClick }: PipelineVisualizerProps) {
+export function PipelineVisualizer({ steps, onPageClick, isProcessing = false }: PipelineVisualizerProps) {
+  if (steps.length === 0 && isProcessing) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 w-full max-w-xl mx-auto">
+        <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-4" />
+        <span className="text-sm text-muted-foreground animate-pulse">Initializing pipeline...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-xl mx-auto py-8">
       <div className="space-y-0 relative">
@@ -95,7 +105,7 @@ function StepCard({ step, onPageClick }: { step: PipelineStep; onPageClick: (pag
                             onClick={() => setIsSourceOpen(!isSourceOpen)}
                             className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
                         >
-                            Sources {isSourceOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                            Sources {isSourceOpen ? <ChevronDown className="h-1 w-1" /> : <ChevronRight className="h-1 w-1" />}
                         </button>
                     )}
                 </div>
