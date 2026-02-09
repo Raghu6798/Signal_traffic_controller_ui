@@ -10,6 +10,7 @@ import TextType from "@/components/TextTyping";
 
 // These labels MUST match the 'step' value sent from factory.py
 const INITIAL_STEPS: PipelineStep[] = [
+  { id: "0", label: "Document Analysis", status: "pending" },
   { id: "1", label: "Day Plan Extraction", status: "pending" },
   { id: "2", label: "Action Plan Extraction", status: "pending" },
   { id: "3", label: "Barrier Mode Analysis", status: "pending" },
