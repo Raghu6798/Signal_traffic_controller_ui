@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { 
   ChevronLeft, FileText, CheckCircle, Clock, AlertCircle, 
   Download, ExternalLink, MoreVertical, Search, Filter, 
-  MapPin, Settings, Loader2
+  MapPin, Settings, Loader2, Upload
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { uploadAndRecordDocument } from "@/lib/s3-actions";
@@ -244,6 +244,50 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
             )}
           </AnimatePresence>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// UploadZone Component
+function UploadZone({ onFileSelect, disabled }: { onFileSelect: (f: File) => void; disabled: boolean }) {
+  const [isDrag, setIsDrag] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div 
+      className={`relative rounded-2xl border-2 border-dashed transition-all p-4 text-center cursor-pointer overflow-hidden flex flex-col items-center justify-center gap-3 ${isDrag ? 'border-blue-500 bg-blue-500/10 shadow-inner' : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+      onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }}
+      onDragLeave={() => setIsDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDrag(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file && file.type === "application/pdf") onFileSelect(file);
+        else toast.error("Please upload a valid PDF file");
+      }}
+      onClick={() => fileInputRef.current?.click()}
+    >
+      <input 
+        type="file" 
+        accept="application/pdf"
+        className="hidden" 
+        ref={fileInputRef} 
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            if (file.type === "application/pdf") onFileSelect(file);
+            else toast.error("Please upload a valid PDF file");
+          }
+          if (e.target) e.target.value = '';
+        }} 
+      />
+      <div className="size-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/20 shadow-inner">
+        <Upload className="size-5" />
+      </div>
+      <div>
+        <p className="text-sm font-bold text-white mb-0.5">Upload Timing PDF</p>
+        <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold">Drag & drop or Click</p>
       </div>
     </div>
   );
