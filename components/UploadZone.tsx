@@ -55,8 +55,8 @@ export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
         "cursor-pointer rounded-lg border-2 border-dashed px-6 py-4 text-center transition-all duration-300",
         "flex items-center justify-center gap-3",
         isDragOver
-          ? "border-blue-500 bg-blue-500/10 scale-[1.02]"
-          : "border-border bg-muted/50 hover:bg-muted",
+          ? "border-white bg-white/10 scale-[1.02] shadow-xl shadow-white/5"
+          : "border-border bg-card hover:bg-muted hover:border-white/20",
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >

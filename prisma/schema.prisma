@@ -1,0 +1,196 @@
+// Signal Phase Timing — Prisma Schema
+// Better-Auth (organization + twoFactor + email/password + google + microsoft)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// BETTER-AUTH CORE MODELS
+// ==========================================
+
+model User {
+  id               String    @id @default(cuid())
+  name             String
+  email            String    @unique
+  emailVerified    Boolean   @default(false)
+  image            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Two-factor auth (twoFactor plugin)
+  twoFactorEnabled Boolean   @default(false)
+
+  // Active organization (organization plugin)
+  activeOrganizationId String?
+
+  sessions         Session[]
+  accounts         Account[]
+  memberships      Member[]
+  invitations      Invitation[]
+  twoFactors       TwoFactor[]
+}
+
+model Session {
+  id                   String   @id @default(cuid())
+  userId               String
+  token                String   @unique
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Security audit fields
+  ipAddress            String?
+  userAgent            String?
+  activeOrganizationId String?
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String    @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model TwoFactor {
+  id          String  @id @default(cuid())
+  userId      String
+  secret      String  // Encrypted TOTP secret
+  backupCodes String  // Encrypted backup codes (JSON array)
+
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// ORGANIZATION, RBAC & WORKSPACES
+// ==========================================
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logo        String?
+  metadata    String?  // JSON string for extra org config (Better-Auth compat)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     Member[]
+  invitations Invitation[]
+  projects    Project[]
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String       @default("member") // owner | admin | member | viewer
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String
+  role           String       @default("member")
+  status         String       @default("pending") // pending | accepted | rejected | canceled
+  inviterId      String
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter        User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// CORE BUSINESS LOGIC
+// ==========================================
+
+model Project {
+  id             String          @id @default(cuid())
+  organizationId String
+  name           String          // e.g., "Downtown Corridor Phase 1"
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  documents      SignalDocument[]
+}
+
+model SignalDocument {
+  id             String          @id @default(cuid())
+  projectId      String
+  intersection   String?         // e.g. "1st St @ D St"
+  fileName       String
+  s3UrlPdf       String
+  s3UrlCsv       String?
+  status         JobStatus       @default(PENDING)
+  uploadedById   String?         // User who uploaded
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  extractedData  ExtractedTiming?
+}
+
+model ExtractedTiming {
+  id            String         @id @default(cuid())
+  documentId    String         @unique
+  dayPlanNo     Int?
+  actionPlanNo  Int?
+  cycleLength   Int?
+  offset        Int?
+  isBarrierMode Boolean?
+  rawJson       Json?          // Full extraction result + reasoning
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  document      SignalDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model RateLimit {
+  id          String   @id
+  key         String
+  count       Int
+  lastRequest BigInt
+}
