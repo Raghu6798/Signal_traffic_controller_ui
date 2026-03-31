@@ -8,6 +8,7 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 import { prisma } from "./db";
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.NODE_ENV === "production" ? "https://signal-traffic-controller-ui.vercel.app" : "http://localhost:3000")),
   appName: "Signal Phase Timing",
 
   // ── Database ────────────────────────────────────────────────────────
@@ -110,8 +111,10 @@ export const auth = betterAuth({
   // ── Trusted Origins ────────────────────────────────────────────────
   trustedOrigins: [
     "http://localhost:3000",
+    "https://signal-traffic-controller-ui.vercel.app",
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
     process.env.BETTER_AUTH_URL ?? "",
-  ].filter(Boolean),
+  ].filter(Boolean) as string[],
 
   // ── Security ───────────────────────────────────────────────────────
   account: {
