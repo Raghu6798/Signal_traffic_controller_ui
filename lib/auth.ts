@@ -127,11 +127,11 @@ export const auth = betterAuth({
   },
 
   // ── Audit Logging ──────────────────────────────────────────────────
-  databaseHooks: {
+  databaseHooks: ({
     session: {
       create: {
-        after: async ({ data, ctx }) => {
-          const ip = ctx?.request?.headers.get("x-forwarded-for") ?? "unknown";
+        after: async (data: any, ctx: any) => {
+          const ip = ctx?.request?.headers?.get?.("x-forwarded-for") ?? "unknown";
           // Use optional chaining to prevent crashes if data is missing
           if (data) {
             console.log(`[AUDIT] New session — user=${(data as any).userId || "unknown"} ip=${ip}`);
@@ -141,14 +141,14 @@ export const auth = betterAuth({
     },
     user: {
       update: {
-        after: async ({ data, oldData }) => {
+        after: async ({ data, oldData }: any) => {
           if (oldData?.email !== data.email) {
             console.log(`[AUDIT] Email changed — user=${data.id}`);
           }
         },
       },
     },
-  },
+  }) as any,
 });
 
 export type Session = typeof auth.$Infer.Session;

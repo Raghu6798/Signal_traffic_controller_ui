@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Zap, Mail, Lock, Eye, EyeOff, User, AlertCircle, Check, Chrome, Building2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, AlertCircle, Check } from "lucide-react";
 import { MagicCard } from "@/components/ui/MagicCard";
 import { signUp, signIn } from "@/lib/auth-client";
 

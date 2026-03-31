@@ -61,12 +61,12 @@ export default function SecuritySettingsPage() {
     if (otp.length !== 6) return;
     setIsLoading(true);
     try {
-      const { data, error } = await authClient.twoFactor.verifyTOTP({
+      const { data, error } = await authClient.twoFactor.verifyTotp({
         code: otp,
       });
       if (error) throw error;
 
-      setBackupCodes(data.backupCodes);
+      setBackupCodes((data as any).backupCodes || []);
       setQrCode(null);
       toast.success("2FA successfully enabled!");
     } catch (err: any) {
