@@ -77,3 +77,30 @@ export async function getProjects() {
     },
   });
 }
+
+
+/**
+ * Saves the extracted timing data to the database.
+ */
+export async function saveExtractionResult(documentId: string, data: any) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) throw new Error("Unauthorized");
+
+  await prisma.signalDocument.update({
+    where: { id: documentId },
+    data: { status: "COMPLETED" }
+  });
+
+  await prisma.extractedTiming.create({
+    data: {
+      documentId,
+      rawJson: data,
+      // Map these if your Python API returns them at the top level:
+      cycleLength: data.cycle_length || null,
+      offset: data.offset || null,
+      isBarrierMode: data.is_barrier_mode || false,
+    }
+  });
+
+  revalidatePath(`/(app)/projects`);
+}

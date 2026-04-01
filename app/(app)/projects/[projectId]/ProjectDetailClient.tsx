@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { uploadAndRecordDocument } from "@/lib/s3-actions";
+import { saveExtractionResult } from "@/lib/actions"; // Make sure to add this in lib/actions.ts!
+import { PipelineVisualizer, PipelineStep, StepStatus } from "@/components/PipelineVisualizer";
 import { toast } from "sonner";
 
 // Types
@@ -35,6 +37,20 @@ type ProjectProps = {
   documents: Document[];
 };
 
+// These MUST match the 'step' strings sent from your Python backend exactly
+const INITIAL_STEPS: PipelineStep[] = [
+  { id: "1", label: "Day Plan Extraction", status: "pending" },
+  { id: "2", label: "Action Plan Extraction", status: "pending" },
+  { id: "3", label: "Barrier Mode Analysis", status: "pending" },
+  { id: "4", label: "Coordination Action Pattern", status: "pending" },
+  { id: "5", label: "Ring & Block Extraction", status: "pending" },
+  { id: "6", label: "Phases In Use Extraction", status: "pending" },
+  { id: "7", label: "Timing Plan Extraction", status: "pending" },
+  { id: "8", label: "Dual Entry Extraction", status: "pending" },
+  { id: "9", label: "Recall Information Extraction", status: "pending" },
+  { id: "10", label: "Data Serialization", status: "pending" },
+];
+
 // Status Pill
 function StatusBadge({ status }: { status: DocumentStatus }) {
   const styles: Record<DocumentStatus, string> = {
@@ -55,6 +71,10 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
   const [documents, setDocuments] = useState<Document[]>(project.documents);
   const [isUploading, setIsUploading] = useState(false);
   const [search, setSearch] = useState("");
+  
+  // Pipeline State
+  const [activeSteps, setActiveSteps] = useState<PipelineStep[]>(INITIAL_STEPS);
+  const [processingDocId, setProcessingDocId] = useState<string | null>(null);
 
   const filtered = documents.filter(doc => 
     doc.intersection?.toLowerCase().includes(search.toLowerCase()) ||
@@ -65,23 +85,111 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
     if (file.size > 10 * 1024 * 1024) return toast.error("File is too large (max 10MB)");
     
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("projectId", project.id);
-    formData.append("intersection", file.name.split('.')[0]);
-
+    setActiveSteps(INITIAL_STEPS); // Reset visualizer
+    
     try {
-      const result = await uploadAndRecordDocument(formData);
+      // 1. Upload to S3 & Create DB Record (PENDING)
+      const s3FormData = new FormData();
+      s3FormData.append("file", file);
+      s3FormData.append("projectId", project.id);
+      s3FormData.append("intersection", file.name.split('.')[0]);
+
+      toast.info("Uploading PDF to secure storage...");
+      const { documentId, success } = await uploadAndRecordDocument(s3FormData);
       
-      if (result.success) {
-        toast.success("PDF uploaded and analysis started!");
-        // Refresh the page data (in a real app, use a listener or polling)
-        window.location.reload(); 
+      if (!success) throw new Error("Database recording failed");
+      setProcessingDocId(documentId);
+      toast.success("Upload complete. Starting AI extraction...");
+
+      // 2. Send to FastAPI Backend
+      const pyFormData = new FormData();
+      pyFormData.append("file", file);
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(API_URL, {
+        method: "POST",
+        body: pyFormData,
+      })
+
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to connect to AI processing engine.");
+      }
+
+      // 3. Read the NDJSON Stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep incomplete chunk in buffer
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          try {
+            const event = JSON.parse(line);
+
+            if (event.type === "progress") {
+              setActiveSteps(prev => {
+                const stepExists = prev.some(s => s.label === event.step);
+                if (stepExists) {
+                  return prev.map(s => s.label === event.step ? { 
+                    ...s, 
+                    status: "running" as StepStatus,
+                    sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : s.sources
+                  } : s);
+                } else {
+                  const nextStepDef = INITIAL_STEPS.find(s => s.label === event.step);
+                  if (!nextStepDef) return prev;
+                  const completedPrev = prev.map(s => ({ ...s, status: "completed" as StepStatus }));
+                  return [...completedPrev, { ...nextStepDef, status: "running" as StepStatus }];
+                }
+              });
+            } 
+            else if (event.type === "step_update") {
+              // Real-time Reasoning Logs
+              setActiveSteps(prev => prev.map(s => 
+                s.label === event.step ? { ...s, reasoning: event.reasoning } : s
+              ));
+            } 
+            else if (event.type === "result") {
+              // Processing Finished!
+              setActiveSteps(prev => prev.map(s => ({ ...s, status: "completed" as StepStatus })));
+              
+              // 4. Save Extracted Data to PostgreSQL
+              await saveExtractionResult(documentId, event.data);
+              
+              toast.success("UTDF extraction complete!", {
+                description: "Data saved to project successfully."
+              });
+              
+              // Short delay to let the user see the "completed" state, then refresh
+              setTimeout(() => {
+                window.location.reload();
+              }, 2000);
+            } 
+            else if (event.type === "error") {
+              throw new Error(event.error);
+            }
+          } catch (e) {
+            console.error("Error parsing stream line:", e);
+          }
+        }
       }
     } catch (err: any) {
-      toast.error(err.message || "Upload failed. Check your S3 credentials in .env.local.");
+      toast.error(err.message || "AI Extraction failed.");
+      setActiveSteps(prev => prev.map(s => s.status === "running" ? { ...s, status: "error" as StepStatus } : s));
+      
+      // If it fails, we should ideally mark the DB document as FAILED
+      // This would require a separate server action or API call
     } finally {
       setIsUploading(false);
+      // We don't clear processingDocId immediately so the user can see errors
     }
   }
 
@@ -109,13 +217,43 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
         <div className="w-full md:w-80 shrink-0">
           <UploadZone onFileSelect={handleFileSelect} disabled={isUploading} />
           {isUploading && (
-            <div className="mt-2 flex items-center justify-center gap-2 text-xs text-white/50">
-              <Loader2 className="size-3 animate-spin text-white" />
-              Uploading and analyzing timing sheet...
+            <div className="mt-2 flex items-center justify-center gap-2 text-xs text-blue-400">
+              <Loader2 className="size-3 animate-spin" />
+              Processing document with AI...
             </div>
           )}
         </div>
       </motion.div>
+
+      {/* Live Pipeline Visualizer (Shown when uploading/processing) */}
+      <AnimatePresence>
+        {(isUploading || processingDocId) && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-6 shadow-inner">
+              <div className="flex items-center gap-2 mb-6 border-b border-blue-500/20 pb-4">
+                <div className="size-8 rounded-full bg-blue-500/20 flex items-center justify-center animate-pulse">
+                  <Zap className="size-4 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-blue-400">Live AI Extraction</h3>
+                  <p className="text-xs text-blue-400/60">Mistral OCR & Gemini 2.5 Pro are parsing the document</p>
+                </div>
+              </div>
+              
+              <PipelineVisualizer 
+                steps={activeSteps} 
+                onPageClick={(page) => console.log("Navigate to page", page)}
+                isProcessing={isUploading}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Filters and List */}
       <div className="space-y-4">
@@ -156,27 +294,6 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
               </motion.div>
             ) : (
               <div className="divide-y divide-border">
-                {/* Uploading Skeleton Item */}
-                {isUploading && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 bg-white/[0.02] animate-pulse">
-                     <div className="flex items-center gap-4 flex-1 min-w-0">
-                       <Skeleton className="size-10 rounded-xl shrink-0" />
-                       <div className="space-y-2 flex-1">
-                          <Skeleton className="h-4 w-48 rounded-md" />
-                          <Skeleton className="h-3 w-32 rounded-md opacity-40" />
-                       </div>
-                     </div>
-                     <div className="flex gap-6 px-4">
-                        <Skeleton className="h-4 w-12 rounded-md opacity-20" />
-                        <Skeleton className="h-4 w-12 rounded-md opacity-20" />
-                     </div>
-                     <div className="flex gap-2">
-                        <Skeleton className="size-9 rounded-xl opacity-20" />
-                        <Skeleton className="size-9 rounded-xl opacity-20" />
-                     </div>
-                  </div>
-                )}
-
                 {filtered.map((doc, i) => (
                   <motion.div
                     key={doc.id}
