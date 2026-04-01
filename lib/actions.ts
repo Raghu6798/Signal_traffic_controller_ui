@@ -8,10 +8,47 @@ import { revalidatePath } from "next/cache";
 /**
  * Creates a new project within the user's active organization.
  */
+// lib/actions.ts
+
 export async function createProject(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !session.session.activeOrganizationId) {
-    throw new Error("Unauthorized: No active organization found.");
+  if (!session) {
+    throw new Error("Unauthorized");
+  }
+
+  let orgId = session.session.activeOrganizationId;
+
+  // Automatically create a default organization if the user doesn't have an active one
+  if (!orgId) {
+    // Check if they belong to any org but just don't have it set as active
+    const existingMembership = await prisma.member.findFirst({
+      where: { userId: session.user.id }
+    });
+
+    if (existingMembership) {
+      orgId = existingMembership.organizationId;
+    } else {
+      // Create a brand new default organization for the user
+      const newOrg = await prisma.organization.create({
+        data: {
+          name: `${session.user.name.split(' ')[0]}'s Workspace`,
+          slug: `workspace-${session.user.id.substring(0, 8).toLowerCase()}`,
+          members: {
+            create: {
+              userId: session.user.id,
+              role: "owner"
+            }
+          }
+        }
+      });
+      orgId = newOrg.id;
+    }
+
+    // Update the current session to make this the active organization
+    await prisma.session.update({
+      where: { id: session.session.id },
+      data: { activeOrganizationId: orgId }
+    });
   }
 
   const name = formData.get("name") as string;
@@ -21,14 +58,13 @@ export async function createProject(formData: FormData) {
     data: {
       name,
       description,
-      organizationId: session.session.activeOrganizationId,
+      organizationId: orgId,
     },
   });
 
   revalidatePath("/(app)/projects");
   return project;
 }
-
 /**
  * Records a new signal document upload in the database.
  */
