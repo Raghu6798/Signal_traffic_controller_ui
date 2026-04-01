@@ -237,7 +237,7 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
             <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-6 shadow-inner">
               <div className="flex items-center gap-2 mb-6 border-b border-blue-500/20 pb-4">
                 <div className="size-8 rounded-full bg-blue-500/20 flex items-center justify-center animate-pulse">
-                  <ap className="size-4 text-blue-400" />
+                  <Zap className="size-4 text-blue-400" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-blue-400">Live AI Extraction</h3>
