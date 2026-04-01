@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { AppShell } from "@/components/layout/AppShell";
 import { prisma } from "@/lib/db";
 
