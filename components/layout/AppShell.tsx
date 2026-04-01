@@ -10,7 +10,7 @@ import {
   LogOut, Sun, Moon, User, Bell, Search, ChevronUp
 } from "lucide-react";
 import { AnimatedThemeToggler } from "../ui/animated-theme-toggler";
-import { signOut, useSession } from "@/lib/auth-client";
+import { signOut, useSession, authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import type { Session } from "@/lib/auth";
 import { useTheme } from "next-themes";
@@ -187,8 +187,8 @@ function Sidebar({
 // ─── Org & Project Switcher ───────────────────────────────────────────────────
 function OrgProjectSwitcher({ session }: { session: Session }) {
   const [orgOpen, setOrgOpen] = useState(false);
-  // In a real impl, fetch orgs from authClient.organization.list()
-  const orgName = "My Organization";
+  const { data: activeOrg } = authClient.useActiveOrganization();
+  const orgName = activeOrg?.name || "My Organization";
 
   return (
     <div className="flex flex-col gap-1">
