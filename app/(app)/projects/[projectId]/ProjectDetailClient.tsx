@@ -6,7 +6,7 @@ import Link from "next/link";
 import { 
   ChevronLeft, FileText, CheckCircle, Clock, AlertCircle, 
   Download, ExternalLink, MoreVertical, Search, Filter, 
-  MapPin, Settings, Loader2, Upload
+  MapPin, Settings, Loader2, Upload,Zap
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { uploadAndRecordDocument } from "@/lib/s3-actions";
