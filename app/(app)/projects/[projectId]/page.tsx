@@ -5,12 +5,16 @@ import { notFound, redirect } from "next/navigation";
 import { ProjectDetailClient } from "./ProjectDetailClient";
 import type { Metadata } from "next";
 
-export async function generateMetadata({ params: { projectId } }: { params: { projectId: string } }): Promise<Metadata> {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+export async function generateMetadata({ params }: { params: Promise<{ projectId: string }> }): Promise<Metadata> {
+  const resolvedParams = await params;
+  const project = await prisma.project.findUnique({ where: { id: resolvedParams.projectId } });
   return { title: project?.name ?? "Project Details" };
 }
 
-export default async function ProjectPage({ params: { projectId } }: { params: { projectId: string } }) {
+export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
+  const resolvedParams = await params;
+  const projectId = resolvedParams.projectId;
+
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/auth/sign-in");
 
