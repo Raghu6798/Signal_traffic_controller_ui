@@ -285,7 +285,7 @@ export default function LandingPage() {
           <FadeIn delay={0.3}>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
               <Link
-                href="/auth/sign-up"
+                href="/dashboard"
                 className="group flex items-center gap-2 px-8 py-4 bg-white hover:bg-white/90 text-black font-bold rounded-2xl text-base transition-all shadow-xl shadow-white/5 active:scale-95"
               >
                 Dashboard   
