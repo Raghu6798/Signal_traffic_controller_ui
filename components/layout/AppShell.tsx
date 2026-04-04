@@ -14,6 +14,14 @@ import { signOut, useSession, authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import type { Session } from "@/lib/auth";
 import { useTheme } from "next-themes";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "../lightswind/breadcrumb";
 
 // ─── Nav item config ─────────────────────────────────────────────────────────
 const navItems = [
@@ -246,6 +254,9 @@ function TopBar({
   onMobileToggle: () => void;
   pageTitle: string;
 }) {
+  const { data: activeOrg } = authClient.useActiveOrganization();
+  const orgName = activeOrg?.name || "Organization";
+
   return (
     <header className="h-14 border-b border-border flex items-center px-4 gap-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
       {/* Mobile burger */}
@@ -254,7 +265,22 @@ function TopBar({
       </button>
 
       {/* Breadcrumb / page title */}
-      <h1 className="text-sm font-semibold text-foreground flex-1">{pageTitle}</h1>
+      <div className="flex-1 overflow-hidden">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem className="hidden sm:block">
+              <BreadcrumbLink href="/dashboard" className="font-medium flex items-center gap-1.5 hover:text-foreground text-foreground/70">
+                <Building2 className="size-3.5" />
+                {orgName}
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="hidden sm:block" />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-semibold text-foreground text-sm">{pageTitle}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
 
       {/* Search */}
       <button className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-muted text-muted-foreground text-xs hover:border-foreground/20 transition-colors">
