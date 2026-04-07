@@ -39,6 +39,7 @@ type ProjectProps = {
 
 // These MUST match the 'step' strings sent from your Python backend exactly
 const INITIAL_STEPS: PipelineStep[] = [
+  { id: "0", label: "Document Analysis", status: "pending" },
   { id: "1", label: "Day Plan Extraction", status: "pending" },
   { id: "2", label: "Action Plan Extraction", status: "pending" },
   { id: "3", label: "Barrier Mode Analysis", status: "pending" },
@@ -49,6 +50,7 @@ const INITIAL_STEPS: PipelineStep[] = [
   { id: "8", label: "Dual Entry Extraction", status: "pending" },
   { id: "9", label: "Recall Information Extraction", status: "pending" },
   { id: "10", label: "Data Serialization", status: "pending" },
+  { id: "11", label: "Finalizing & Uploading to S3", status: "pending" },
 ];
 
 // Status Pill
@@ -101,12 +103,11 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
       setProcessingDocId(documentId);
       toast.success("Upload complete. Starting AI extraction...");
 
-      // 2. Send to FastAPI Backend
+      // 2. Call our Next.js Proxy API (which handles streaming and auth)
       const pyFormData = new FormData();
       pyFormData.append("file", file);
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(API_URL, {
+      const response = await fetch("/api/process-timing", {
         method: "POST",
         body: pyFormData,
       })
@@ -141,13 +142,18 @@ export function ProjectDetailClient({ project, user }: { project: ProjectProps, 
                   return prev.map(s => s.label === event.step ? { 
                     ...s, 
                     status: "running" as StepStatus,
+                    reasoning: event.reasoning || s.reasoning,
                     sources: event.pages ? event.pages.map((p: number) => `Page ${p}`) : s.sources
                   } : s);
                 } else {
-                  const nextStepDef = INITIAL_STEPS.find(s => s.label === event.step);
-                  if (!nextStepDef) return prev;
-                  const completedPrev = prev.map(s => ({ ...s, status: "completed" as StepStatus }));
-                  return [...completedPrev, { ...nextStepDef, status: "running" as StepStatus }];
+                  const nextStepDef = INITIAL_STEPS.find(s => s.label === event.step) || {
+                    id: Math.random().toString(),
+                    label: event.step,
+                    status: "running" as StepStatus,
+                    reasoning: event.reasoning
+                  };
+                  const completedPrev = prev.map(s => s.status === "pending" ? s : { ...s, status: "completed" as StepStatus });
+                  return [...completedPrev.filter(s => s.label !== event.step), { ...nextStepDef, status: "running" as StepStatus }];
                 }
               });
             } 

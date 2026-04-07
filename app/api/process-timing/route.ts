@@ -14,24 +14,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 2. Safely grab the data the user wants to process
-  const body = await req.json();
-
+  // 2. Safely grab the file data from the multipart request
+  const formData = await req.formData();
+  
   const lambdaResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/process-signal-timing`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-
       "Authorization": `Bearer ${process.env.LAMBDA_SECRET_API_KEY}` 
     },
-    body: JSON.stringify({
-      ...body,
-      userId: session.user.id 
-    })
+    body: formData // Forward the multipart/form-data to the Lambda backend
   });
 
-  const data = await lambdaResponse.json();
-  
+  if (!lambdaResponse.ok) {
+    const errorBody = await lambdaResponse.text();
+    return NextResponse.json({ error: "Backend error", detail: errorBody }, { status: lambdaResponse.status });
+  }
 
-  return NextResponse.json(data);
+  // Stream the backend response to the frontend for real-time progress updates
+  return new Response(lambdaResponse.body, {
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
